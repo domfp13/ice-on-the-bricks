@@ -10,18 +10,21 @@ CREATE CATALOG IF NOT EXISTS 03_CONCURRENCY;
 
 USE CATALOG 03_CONCURRENCY;
 
+-- !!! IMPORTANT !!!!
+-- In case the you need the schema in a different location than the default catalog location
 --CREATE SCHEMA IF NOT EXISTS BRONZE MANAGED LOCATION "abfss://delta@dbxdl.dfs.core.windows.net/default/";
 
-USE SCHEMA bronze;
+USE SCHEMA default;
 
---DROP TABLE IF EXISTS lineitems;
+-- Reading few records from the source Parquet files
 SELECT * FROM PARQUET.`abfss://warehouse@dbxdl.dfs.core.windows.net/lineitems/*` LIMIT 5;
 
+-- Creating RAW_LINEITEMS_WAREHOUSE table to land the data
 CREATE OR REPLACE TABLE 03_CONCURRENCY.default.RAW_LINEITEMS_WAREHOUSE (
   V VARIANT
 ) USING DELTA;
 
-SELECT * FROM 03_CONCURRENCY.default.raw_lineitems_warehouse;
+SELECT * FROM 03_CONCURRENCY.default.RAW_LINEITEMS_WAREHOUSE LIMIT 10;
 
 -- Copying the data over the table
 -- !!! IMPORTANT !!!!
