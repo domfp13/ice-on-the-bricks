@@ -1,33 +1,33 @@
 SHOW EXTERNAL LOCATIONS;
 
+-- 1. Data to be loaded into Delta Table
 LIST 'abfss://demo@dbxdl.dfs.core.windows.net/lineitems/' WITH (CREDENTIAL `dbxdl-storage-account-creds`);
 
 SHOW CATALOGS;
 
-DROP CATALOG IF EXISTS MASTERCLASS CASCADE;
-CREATE CATALOG IF NOT EXISTS MASTERCLASS;
+DROP CATALOG IF EXISTS 03_CONCURRENCY CASCADE;
+CREATE CATALOG IF NOT EXISTS 03_CONCURRENCY;
 
-USE CATALOG MASTERCLASS;
-CREATE SCHEMA IF NOT EXISTS BRONZE;
+USE CATALOG 03_CONCURRENCY;
 
---CREATE SCHEMA IF NOT EXISTS BRONZE MANAGED LOCATION "abfss://delta@dbxdl.dfs.core.windows.net/bronze/";
+--CREATE SCHEMA IF NOT EXISTS BRONZE MANAGED LOCATION "abfss://delta@dbxdl.dfs.core.windows.net/default/";
 
 USE SCHEMA bronze;
 
 --DROP TABLE IF EXISTS lineitems;
 SELECT * FROM PARQUET.`abfss://warehouse@dbxdl.dfs.core.windows.net/lineitems/*` LIMIT 5;
 
-CREATE OR REPLACE TABLE MASTERCLASS.BRONZE.RAW_LINEITEMS_WAREHOUSE (
+CREATE OR REPLACE TABLE 03_CONCURRENCY.default.RAW_LINEITEMS_WAREHOUSE (
   V VARIANT
 ) USING DELTA;
 
-SELECT * FROM masterclass.bronze.raw_lineitems_warehouse;
+SELECT * FROM 03_CONCURRENCY.default.raw_lineitems_warehouse;
 
 -- Copying the data over the table
 -- !!! IMPORTANT !!!!
 -- COPY INTO must list the source path every run to decide what’s new. Listing millions of files on ADLS Gen2 becomes slow and expensive (many list calls).
 -- Auto Loader’s clean source options to DELETE/MOVE after ~30 days
-COPY INTO MASTERCLASS.BRONZE.RAW_LINEITEMS_WAREHOUSE
+COPY INTO 03_CONCURRENCY.default.RAW_LINEITEMS_WAREHOUSE
 FROM (
   SELECT parse_json(to_json(struct(*))) AS V 
   FROM 'abfss://warehouse@dbxdl.dfs.core.windows.net/lineitems/*'
@@ -36,10 +36,10 @@ FILEFORMAT = PARQUET
 FORMAT_OPTIONS ('singleVariantColumn' = 'true');
 
 -- Counting 59,986,052
-SELECT COUNT(*) FROM MASTERCLASS.BRONZE.RAW_LINEITEMS_WAREHOUSE;
-SELECT * FROM MASTERCLASS.BRONZE.RAW_LINEITEMS_WAREHOUSE LIMIT 10;
+SELECT COUNT(*) FROM 03_CONCURRENCY.default.RAW_LINEITEMS_WAREHOUSE;
+SELECT * FROM 03_CONCURRENCY.default.RAW_LINEITEMS_WAREHOUSE LIMIT 10;
 -- Suspend SQL Warehouse
-SELECT COUNT(*) FROM MASTERCLASS.BRONZE.RAW_LINEITEMS_WAREHOUSE;
+SELECT COUNT(*) FROM 03_CONCURRENCY.default.RAW_LINEITEMS_WAREHOUSE;
 
 -- Selecting 5 random values
 SELECT
@@ -59,7 +59,7 @@ SELECT
   variant_get(V, '$.L_SHIPINSTRUCT') AS ship_instruct,
   variant_get(V, '$.L_SHIPMODE') AS ship_mode,
   variant_get(V, '$.L_COMMENT') AS comment
-FROM MASTERCLASS.BRONZE.RAW_LINEITEMS_WAREHOUSE
+FROM 03_CONCURRENCY.default.RAW_LINEITEMS_WAREHOUSE
 ORDER BY RAND() LIMIT 5;
 
 -- QUERY RECORDS
@@ -80,7 +80,7 @@ SELECT
   variant_get(V, '$.L_SHIPINSTRUCT') AS ship_instruct,
   variant_get(V, '$.L_SHIPMODE') AS ship_mode,
   variant_get(V, '$.L_COMMENT') AS comment
-FROM MASTERCLASS.BRONZE.RAW_LINEITEMS_WAREHOUSE
+FROM 03_CONCURRENCY.default.RAW_LINEITEMS_WAREHOUSE
 -- This will failed due to the premature SQL engine, the attribute needs to be casted twice
 --WHERE order_key IN (
 WHERE CAST(variant_get(V, '$.L_ORDERKEY') AS STRING) IN (
@@ -92,7 +92,7 @@ WHERE CAST(variant_get(V, '$.L_ORDERKEY') AS STRING) IN (
 );
 
 -- Creating table
-CREATE OR REPLACE TABLE MASTERCLASS.BRONZE.LINEITEMS_WAREHOUSE
+CREATE OR REPLACE TABLE 03_CONCURRENCY.default.LINEITEMS_WAREHOUSE
 USING DELTA
 AS
 SELECT
@@ -112,20 +112,20 @@ SELECT
   CAST(variant_get(V, '$.L_SHIPINSTRUCT') AS VARCHAR(30)) AS L_SHIPINSTRUCT,
   CAST(variant_get(V, '$.L_SHIPMODE') AS VARCHAR(30)) AS L_SHIPMODE,
   CAST(variant_get(V, '$.L_COMMENT') AS VARCHAR(100)) AS L_COMMENT
-FROM masterclass.bronze.raw_lineitems_warehouse;
+FROM 03_CONCURRENCY.default.raw_lineitems_warehouse;
 
-SELECT * FROM masterclass.bronze.lineitems_warehouse LIMIT 10;
+SELECT * FROM 03_CONCURRENCY.default.lineitems_warehouse LIMIT 10;
 
 -- CLEAN UP
--- USE CATALOG MASTERCLASS;
--- USE SCHEMA bronze;
+-- USE CATALOG 03_CONCURRENCY;
+-- USE SCHEMA default;
 
--- DROP TABLE IF EXISTS masterclass.bronze.lineitems;
--- DROP TABLE IF EXISTS masterclass.bronze.lineitems_warehouse;
--- DROP TABLE IF EXISTS masterclass.bronze.raw_lineitems;
--- DROP TABLE IF EXISTS masterclass.bronze.raw_lineitems_warehouse;
--- DROP TABLE IF EXISTS masterclass.bronze.raw_lineitems_dlt;
+-- DROP TABLE IF EXISTS 03_CONCURRENCY.default.lineitems;
+-- DROP TABLE IF EXISTS 03_CONCURRENCY.default.lineitems_warehouse;
+-- DROP TABLE IF EXISTS 03_CONCURRENCY.default.raw_lineitems;
+-- DROP TABLE IF EXISTS 03_CONCURRENCY.default.raw_lineitems_warehouse;
+-- DROP TABLE IF EXISTS 03_CONCURRENCY.default.raw_lineitems_dlt;
 
--- DROP SCHEMA IF EXISTS masterclass.bronze CASCADE;
--- DROP SCHEMA IF EXISTS masterclass.silver CASCADE;
--- DROP SCHEMA IF EXISTS masterclass.default CASCADE;
+-- DROP SCHEMA IF EXISTS 03_CONCURRENCY.default CASCADE;
+-- DROP SCHEMA IF EXISTS 03_CONCURRENCY.silver CASCADE;
+-- DROP SCHEMA IF EXISTS 03_CONCURRENCY.default CASCADE;
